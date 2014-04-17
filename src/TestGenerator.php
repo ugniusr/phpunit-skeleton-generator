@@ -82,6 +82,14 @@ namespace SebastianBergmann\PHPUnit\SkeletonGenerator
                     $inSourceFile = '<internal>';
                 }
 
+                $constructor = $reflector->getConstructor();
+                if (null !== $constructor) {
+                	$this->dependencies = $constructor->getParameters();
+                } else {
+                	$this->dependencies = null;
+                }
+
+
                 unset($reflector);
             } else {
                 if (empty($inSourceFile)) {
@@ -297,6 +305,7 @@ namespace SebastianBergmann\PHPUnit\SkeletonGenerator
                                     'expected'       => $matches[3],
                                     'origMethodName' => $origMethodName,
                                     'className'      => $this->inClassName['fullyQualifiedClassName'],
+				                            'classNameShort' => $this->inClassName['className'],
                                     'methodName'     => $methodName
                                   )
                                 );
@@ -322,6 +331,7 @@ namespace SebastianBergmann\PHPUnit\SkeletonGenerator
                         $methodTemplate->setVar(
                           array(
                             'className'      => $this->inClassName['fullyQualifiedClassName'],
+                            'classNameShort' => $this->inClassName['className'],
                             'methodName'     => ucfirst($method->getName()),
                             'origMethodName' => $method->getName()
                           )
@@ -330,7 +340,45 @@ namespace SebastianBergmann\PHPUnit\SkeletonGenerator
                         $incompleteMethods .= $methodTemplate->render();
                     }
                 }
+            } # End loop through methods
+
+            $dependenciesTmpls = '';
+            $depClassList = '';
+            foreach ($this->dependencies as $dependency) {
+
+              // If dependency has a class associated with it:
+              if (null !== $dependency->getClass()) {
+                $depFullyQualifiedClassName = $dependency->getClass()->getName();
+                $depClassName = \explode('\\', $depFullyQualifiedClassName);
+                $depClassName = end($depClassName);
+
+                $dependencyTemplate = new \Text_Template(
+                  sprintf(
+                    '%s%stemplate%sDependency.tpl',
+
+                    __DIR__,
+                    DIRECTORY_SEPARATOR,
+                    DIRECTORY_SEPARATOR
+                  )
+                );
+
+                $dependencyTemplate->setVar(
+                  array(
+                    'depFullyQualifiedClassName' => $depFullyQualifiedClassName,
+                    'depClassName' => $depClassName,
+                    )
+                );
+
+                $dependenciesTmpls .= $dependencyTemplate->render();
+                if ('' !== $depClassList) {
+                  $depClassList .= ", ";
+                }
+                $depClassList .= "\$this->mock" . $depClassName;
+
+              } # End If
+
             }
+
 
             $classTemplate = new \Text_Template(
               sprintf(
@@ -354,8 +402,11 @@ namespace SebastianBergmann\PHPUnit\SkeletonGenerator
                 'namespace'          => $namespace,
                 'namespaceSeparator' => !empty($namespace) ? '\\' : '',
                 'className'          => $this->inClassName['className'],
-                'testClassName'      => $this->outClassName['className'],
+                'fullyQualifiedClassName'      => $this->inClassName['fullyQualifiedClassName'],
+		            'testClassName'      => $this->outClassName['className'],
                 'methods'            => $methods . $incompleteMethods,
+                'dependencies'       => $dependenciesTmpls,
+                'depClassList'       => $depClassList,
                 'date'               => date('Y-m-d'),
                 'time'               => date('H:i:s'),
                 'version'            => Version::id()

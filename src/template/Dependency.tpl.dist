@@ -1,0 +1,4 @@
+        $this->mock{depClassName} = $this->getMockBuilder
+                ('{depFullyQualifiedClassName}')
+            ->disableOriginalConstructor()
+            ->getMock();
